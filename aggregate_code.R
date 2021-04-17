@@ -23,15 +23,17 @@ library(tidyverse)
 library(RCurl)
 library(stringr)
 
-# this updates daily
+# this updates daily, getURL pulls raw text from this location
 x <- getURL("https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties.csv")
 covid_data <- read.csv(text = x)
-rm(x)  # remove chonkey raw text that we don't need anymore
+rm(x)
 
 population_data <- read_csv(paste0(data_dir,"co-est2019-alldata.csv"))
 population_data$STATE <- str_remove(as.character(population_data$STATE), "^0+")
 population_data$COUNTY <- str_pad(population_data$COUNTY,
                                   width = 3, pad = "0",side = "left")
+
+
 
 population_data$fips <- as.integer(paste0(
                                       population_data$STATE,
