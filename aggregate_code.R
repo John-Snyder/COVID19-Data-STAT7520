@@ -17,7 +17,7 @@
 # -- NOTE USED
 # https://raw.githubusercontent.com/nytimes/covid-19-data/master/excess-deaths/deaths.csv
 
-data_dir <- "~/Dropbox-NAS/STAT_7520/Project/Data/SP_2021/raw_data/"
+data_dir <- "~/Dropbox/STAT_7520/Project/Data/SP_2021/raw_data/"
 library(tidyverse)
 library(RCurl)
 library(stringr)
@@ -28,6 +28,11 @@ covid_data <- read.csv(text = x)
 rm(x)
 
 covid_data <- covid_data %>% filter(county != "Unknown")
+covid_data <- covid_data %>% filter(state != "Puerto Rico")
+covid_data <- covid_data %>% filter(state != "Virgin Islands")
+covid_data <- covid_data %>% filter(state != "Northern Mariana Islands")
+
+covid_data$fips[covid_data$county == "New York City"] <- 99999
 
 population_data <- read_csv(paste0(data_dir,"co-est2019-alldata.csv"))
 population_data$STATE <- str_remove(as.character(population_data$STATE), "^0+")
@@ -39,6 +44,14 @@ population_data$fips <- as.integer(paste0(
   population_data$STATE,
   population_data$COUNTY))
 
+
+population_data$CTYNAME[
+  population_data$STNAME == "New York" & 
+    population_data$CTYNAME %in% c("Bronx County",
+                                   "Kings County",
+                                   "New York County",
+                                   "Queens County",
+                                   "Richmond County")] <- "New York City"
 
 population_data <- population_data %>% mutate(
   fips = as.integer( paste0( STATE, COUNTY ) ),
@@ -59,14 +72,33 @@ population_data <- population_data %>% mutate(
              avg_dom_mig,
              num_Grp_quarters)
 
+NYC_AGG <- 
+population_data %>% 
+  filter(CTYNAME == "New York City") %>% 
+  select(-fips,-CTYNAME) %>% 
+  colSums %>% t %>%
+  as.data.frame %>% 
+  mutate(fips = 99999,
+         CTYNAME = "New York City")
+
+population_data <- 
+population_data %>% 
+  filter(CTYNAME != "New York City") %>%
+  bind_rows(NYC_AGG)
+
+
+
 covid_data <- covid_data %>% left_join(population_data, by = "fips")
 rm(population_data)
 
+rows_NE <- 
 sapply(1:nrow(covid_data), function(i) {
   grepl(pattern = covid_data$county[i],x = covid_data$CTYNAME[i])
 })
 
+mean(!rows_NE)
 
+covid_data[which(!rows_NE),] %>% View
 
 demographic_data <- read_csv(paste0(data_dir,"cc-est2019-alldata.csv")) %>% 
   filter(YEAR == 12)  # most recent estimates
