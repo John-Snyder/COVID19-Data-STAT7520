@@ -28,20 +28,44 @@ x <- getURL("https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-c
 covid_data <- read.csv(text = x)
 rm(x)
 
+covid_data <- covid_data %>% filter(county != "Unknown")
+
 population_data <- read_csv(paste0(data_dir,"co-est2019-alldata.csv"))
 population_data$STATE <- str_remove(as.character(population_data$STATE), "^0+")
 population_data$COUNTY <- str_pad(population_data$COUNTY,
                                   width = 3, pad = "0",side = "left")
 
-
-
+# make FIPS code for joining to covid_data
 population_data$fips <- as.integer(paste0(
-                                      population_data$STATE,
-                                      population_data$COUNTY))
+  population_data$STATE,
+  population_data$COUNTY))
+
+
+population_data <- population_data %>% mutate(
+  fips = as.integer( paste0( STATE, COUNTY ) ),
+  Pop_2019 = POPESTIMATE2019,
+  avg_pop_chg = rowMeans(select(population_data, starts_with("NPOPCHG_20"))),
+  avg_bth_num = rowMeans(select(population_data, starts_with("BIRTHS20"))),
+  avg_dth_num = rowMeans(select(population_data, starts_with("DEATHS20"))),
+  avg_itl_mig = rowMeans(select(population_data, starts_with("INTERNATIONALMIG20"))),
+  avg_dom_mig = rowMeans(select(population_data, starts_with("DOMESTICMIG20"))),
+  num_Grp_quarters = GQESTIMATES2019,
+) %>% select(fips,
+             CTYNAME,
+             Pop_2019,
+             avg_pop_chg,
+             avg_bth_num,
+             avg_dth_num,
+             avg_itl_mig,
+             avg_dom_mig,
+             num_Grp_quarters)
 
 covid_data <- covid_data %>% left_join(population_data, by = "fips")
 rm(population_data)
 
+sapply(1:nrow(covid_data), function(i) {
+  grepl(pattern = covid_data$county[i],x = covid_data$CTYNAME[i])
+})
 
 
 
