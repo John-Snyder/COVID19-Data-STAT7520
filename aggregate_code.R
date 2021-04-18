@@ -18,7 +18,6 @@
 # https://raw.githubusercontent.com/nytimes/covid-19-data/master/excess-deaths/deaths.csv
 
 data_dir <- "~/Dropbox-NAS/STAT_7520/Project/Data/SP_2021/raw_data/"
-
 library(tidyverse)
 library(RCurl)
 library(stringr)
