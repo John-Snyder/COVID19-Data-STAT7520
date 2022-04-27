@@ -20,7 +20,7 @@ library(stringr)
 # https://raw.githubusercontent.com/nytimes/covid-19-data/master/excess-deaths/deaths.csv
 
 # 
-data_dir <- "~/Dropbox-NAS/STAT_7520/Project/Data/SP_2021/raw_data/"
+data_dir <- "~/Dropbox/Mizzou/Teaching/STAT_7520/Project/Data/SP_2022/raw_data/"
 ####################################################################################################
 # Pull raw COVID count data                                                                        #
 ####################################################################################################
@@ -30,10 +30,10 @@ covid_data <- read.csv(text = x)
 rm(x)
 
 # Some areas do not have demographic data from the census bureau, so we will remove them here.
-covid_data <- covid_data %>% filter(county != "Unknown")
-covid_data <- covid_data %>% filter(state != "Puerto Rico")
-covid_data <- covid_data %>% filter(state != "Virgin Islands")
-covid_data <- covid_data %>% filter(state != "Northern Mariana Islands")
+covid_data <- covid_data |> filter(county != "Unknown")
+covid_data <- covid_data |> filter(state != "Puerto Rico")
+covid_data <- covid_data |> filter(state != "Virgin Islands")
+covid_data <- covid_data |> filter(state != "Northern Mariana Islands")
 
 # The 5 boroughs of NYC are aggregated to "New York City", and no
 # fips code provided, so we add a dummy one.
@@ -69,7 +69,7 @@ population_data$fips <- as.integer(paste0(
 # Manipulate variables:
 # There would be more possibilities one could work with, see 
 # co-est2019-alldata_Column_Descriptions.pdf for details
-population_data <- population_data %>% mutate(
+population_data <- population_data |> mutate(
   Pop_2019 = POPESTIMATE2019,
   # Compute 10yr average changes for each county
   avg_pop_chg = rowMeans(select(population_data, starts_with("NPOPCHG_20"))),
@@ -78,15 +78,16 @@ population_data <- population_data %>% mutate(
   avg_itl_mig = rowMeans(select(population_data, starts_with("INTERNATIONALMIG20"))),
   avg_dom_mig = rowMeans(select(population_data, starts_with("DOMESTICMIG20"))),
   num_Grp_quarters = GQESTIMATES2019,
-) %>% select(fips,
-             CTYNAME,
-             Pop_2019,
-             avg_pop_chg,
-             avg_bth_num,
-             avg_dth_num,
-             avg_itl_mig,
-             avg_dom_mig,
-             num_Grp_quarters)
+) |> select(fips,
+            CTYNAME,
+            STNAME,
+            Pop_2019,
+            avg_pop_chg,
+            avg_bth_num,
+            avg_dth_num,
+            avg_itl_mig,
+            avg_dom_mig,
+            num_Grp_quarters)
 
 # Now deal with NYC: 
 # Merge the 5 boroughs
@@ -98,31 +99,33 @@ population_data$CTYNAME[
                                    "Queens County",
                                    "Richmond County")] <- "New York City"
 
+population_data <- population_data |> select(-STNAME)
+
 # add everything up and get it ready for merging back in
 NYC_AGG <- 
-  population_data %>% 
-  filter(CTYNAME == "New York City") %>% 
-  select(-fips,-CTYNAME) %>% 
-  colSums %>% t %>%
-  as.data.frame %>% 
+  population_data |> 
+  filter(CTYNAME == "New York City") |> 
+  select(-fips,-CTYNAME) |> 
+  colSums() |> t() |>
+  as.data.frame() |> 
   mutate(fips = 99999,
          CTYNAME = "New York City")
 
 # Remove borough level data and bring in aggregated data
 population_data <- 
-  population_data %>% 
-  filter(CTYNAME != "New York City") %>%
+  population_data |> 
+  filter(CTYNAME != "New York City") |>
   bind_rows(NYC_AGG)
 
-covid_data <- covid_data %>% 
-  left_join(population_data, by = "fips") %>%
-  na.omit %>% # this removes some counties that the NYtimes aggregated, e.g. in Alaska
+covid_data <- covid_data |> 
+  left_join(population_data, by = "fips") |>
+  na.omit() |> # this removes some counties that the NYtimes aggregated, e.g. in Alaska
   select(-CTYNAME)
 
 rm("population_data","NYC_AGG")
 
 #############################################################################################
-demographic_data <- read_csv(paste0(data_dir,"cc-est2019-alldata.csv")) %>% 
+demographic_data <- read_csv(paste0(data_dir,"cc-est2019-alldata.csv")) |> 
   filter(YEAR == 12, AGEGRP != 0)  # most recent estimates, rem overall totals
 
 # similar logic to before
@@ -130,8 +133,8 @@ demographic_data$STATE <- str_remove(as.character(demographic_data$STATE), "^0+"
 demographic_data$COUNTY <- str_pad(demographic_data$COUNTY,
                                    width = 3, pad = "0",side = "left")
 
-demographic_data <-demographic_data %>% 
-  mutate(fips = as.integer( paste0( STATE, COUNTY ) )) %>% 
+demographic_data <-demographic_data |> 
+  mutate(fips = as.integer( paste0( STATE, COUNTY ) )) |> 
   select(-STATE,-COUNTY)
 
 demographic_data$CTYNAME[
@@ -143,17 +146,17 @@ demographic_data$CTYNAME[
                                     "Richmond County")] <- "New York City"
 
 NYC_AGG <- 
-  demographic_data %>% 
-  filter(CTYNAME == "New York City") %>% 
-  group_by(CTYNAME,SUMLEV,STNAME,YEAR,AGEGRP) %>% 
-  summarise_all(sum) %>%
-  as.data.frame %>% 
+  demographic_data |> 
+  filter(CTYNAME == "New York City") |> 
+  group_by(CTYNAME,SUMLEV,STNAME,YEAR,AGEGRP) |> 
+  summarise_all(sum) |>
+  as.data.frame() |> 
   mutate(fips = 99999,
          CTYNAME = "New York City")
 
 demographic_data <- 
-  demographic_data %>% 
-  filter(CTYNAME != "New York City") %>%
+  demographic_data |> 
+  filter(CTYNAME != "New York City") |>
   bind_rows(NYC_AGG)
 
 # Group ages together into covid related ones.
@@ -163,14 +166,14 @@ demographic_data$AGE_GRP_AGG[demographic_data$AGEGRP >= 5 & demographic_data$AGE
 demographic_data$AGE_GRP_AGG[demographic_data$AGEGRP >= 14] <- "AGE_ge65"
 
 
-demographic_data <- demographic_data %>%
-  group_by(AGE_GRP_AGG, fips) %>% 
-  summarise(ppl = sum(TOT_POP)) %>%
+demographic_data <- demographic_data |>
+  group_by(AGE_GRP_AGG, fips) |> 
+  summarise(ppl = sum(TOT_POP)) |>
   spread(AGE_GRP_AGG, ppl)
 
-covid_data <- covid_data %>% 
-  left_join(demographic_data, by = "fips") %>%
-  na.omit
+covid_data <- covid_data |> 
+  left_join(demographic_data, by = "fips") |>
+  na.omit()
 
 rm("demographic_data","NYC_AGG")
 
@@ -183,30 +186,30 @@ rm(x)
 names(maskuse_data) <- paste0("maskprop_", names(maskuse_data))
 
 NYC_AGG <- 
-  maskuse_data %>% 
-  filter( maskprop_COUNTYFP %in% c( 36005, 36047, 36061, 36081, 36085 ) ) %>% 
-  select(-maskprop_COUNTYFP) %>% 
-  colMeans() %>% t %>%
-  as.data.frame %>% 
+  maskuse_data |> 
+  filter( maskprop_COUNTYFP %in% c( 36005, 36047, 36061, 36081, 36085 ) ) |> 
+  select(-maskprop_COUNTYFP) |> 
+  colMeans() |> t() |>
+  as.data.frame() |> 
   mutate(maskprop_COUNTYFP = 99999)
 
 maskuse_data <- 
-  maskuse_data %>% 
-  filter( !(maskprop_COUNTYFP %in% c( 36005, 36047, 36061, 36081, 36085 )) ) %>%
-  bind_rows(NYC_AGG) %>% 
+  maskuse_data |> 
+  filter( !(maskprop_COUNTYFP %in% c( 36005, 36047, 36061, 36081, 36085 )) ) |>
+  bind_rows(NYC_AGG) |> 
   rename(fips = maskprop_COUNTYFP)
 
-covid_data <- covid_data %>% 
-  left_join(maskuse_data, by = "fips") %>%
-  na.omit
+covid_data <- covid_data |> 
+  left_join(maskuse_data, by = "fips") |>
+  na.omit()
 
 rm("maskuse_data", "NYC_AGG")
 
 ####################################################################################################
 ## Create state level data
 ####################################################################################################
-covid_data_state <- covid_data %>% 
-  group_by(date,state) %>%
+covid_data_state <- covid_data |> 
+  group_by(date,state) |>
   summarise(cases = sum(cases),
             deaths = sum(deaths),
             Pop_2019 = sum(Pop_2019),
@@ -236,19 +239,3 @@ write.csv(covid_data,
 write.csv(covid_data_state, 
           file = paste0(data_dir,"curated_data_state.csv"),
           row.names=FALSE)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
